@@ -1,0 +1,19 @@
+{
+  "name": "authproject",
+  "version": "1.0.0",
+  "description": "auth template project to include in all other projects",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "MERN"
+  ],
+  "author": "Raahat Khan",
+  "license": "ISC",
+  "devDependencies": {
+    "nodemon": "^3.1.0",
+    "prettier": "^3.2.5"
+  }
+}
