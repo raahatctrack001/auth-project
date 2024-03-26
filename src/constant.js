@@ -1,3 +1,1 @@
-const PORT = 3000;
-
-export {PORT}
+export const DB_NAME = "auth-project";
