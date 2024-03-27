@@ -1,8 +1,8 @@
 import apiError from "../utils/apiError.js";
 import apiResponse from '../utils/apiReponse.js'
 import asyncHandler from "../utils/asyncHandler.js";
-import { User } from '../models/user.model.js'
-import { threadId } from "worker_threads";
+import { User } from '../models/user.model.js';
+import bcryptjs from 'bcryptjs';
 
 /********************* Time to Learn RegEx **************************/
 // Username validation: alphanumeric characters and underscores allowed, length between 5 and 20 characters
@@ -92,7 +92,7 @@ const options = {
 
 export const registerUser = asyncHandler(async (req, res, next)=>{
     const {username, email, password, confirmPassword} = req.body;
-    console.log(req.body)
+    // console.log(req.body)
 
     // throw new apiError(500,"intentional termination for unit testing!");
     validateCredentials(username, email, password, confirmPassword);
@@ -213,4 +213,70 @@ export const logoutUser = asyncHandler(async(req,res, next)=>{
     );
 })
 
+/*
+ * To Do's for forgot password
+    * extract email/username or mobile: check if user exists
+    * if exists first clear all tokens refresh and access
+    * verify user using otp from email or phonenumber or other mechanis
+    * extract data from data base and req.user = requestedUser
+    * validate password
+    * find and update in databse
+    * send response  
+ */
+// export const resetPassword = asyncHandler(async (req, res, next)=>{
+//     const { password, confirmPassword } = req.body;
+// })
 
+
+/**
+ * To Do's for change password:
+    * use middleware to get current user
+    * check if old password matches with existing record else vaidate it
+    * check if password and confirm password mathes else validate it
+    * now check if password is abidind criteria
+    * find user and update it
+    * save the data, it will automatically hash it as we had already injected hook pre!
+ */
+export const changeCurrentPassword = asyncHandler(async (req, res, next)=>{
+    console.log(req.body)
+    const {oldPassword, newPassword, confirmPassword} = req.body;
+    if(newPassword !== confirmPassword){
+        throw new apiError(404, "password didnot match!");
+    }
+    
+    // console.log(password === confirmPassword);
+    if(!validatePassword(newPassword)){
+        console.log(newPassword)
+        throw new apiError(400, "Password must be at least 8 characters consisting of letters (uppercase and lowercase), digits, and the only one among specified (@, $, !, %, *, ?, &) special characters.")
+    }
+    const hashedPassword = bcryptjs.hashSync(newPassword);
+    let currentUser = await User.findById(req.user?._id);
+    currentUser.password  = hashedPassword;
+    currentUser
+    .save()
+    .then((savedUser)=>{
+        console.log("password change Successful!", savedUser);
+    })
+    .catch((error)=>{
+        throw new apiError(401, error.message || "FAILED to change password!")
+    })
+    // console.log(currentUser)
+    // console.log(req.user)
+    // throw new apiErro r(500, "intentional termination for unit testing!")
+    
+    
+    //working but need hashing!
+    // const currentUser = await User.findByIdAndUpdate(
+    //     req.user?._id,
+    //     {
+    //         $set:{
+    //             password: newPassword,
+    //         }
+    //     },
+    //     {
+    //         new: true   
+    //     }
+    // );
+    console.log(currentUser);
+
+})
