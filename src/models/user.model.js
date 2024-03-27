@@ -23,7 +23,10 @@ const userSchema = new mongoose.Schema(
         type: String, 
         required: true,
         trim: true,
-      }  
+      } , 
+      refreshToken: {
+        type: String,
+      }
     }, 
     {timestamps:true}
 );
@@ -31,13 +34,12 @@ const userSchema = new mongoose.Schema(
 
 
 //pre hook: before 'save' this document do this following
-userSchema.pre('save', (next)=>{
-    if(!this.isModified("password")){   
-        next();
-    }
+userSchema.pre("save", async function (next) {
+    if(!this.isModified("password")) 
+        return next();
 
-    this.password = bcryptjs.hashSync(this.password, 10);
-    next();
+    this.password = await bcryptjs.hash(this.password, 10)
+    next()
 })
 
 //method injection: to check whether entered password is correct or not
