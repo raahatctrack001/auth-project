@@ -184,3 +184,33 @@ export const loginUser = asyncHandler(async(req, res, next)=>{
             new apiResponse(200, "Login Successful!", {user: loggedInUser, accessToken, refreshToken})
         );   
 })
+
+
+/*
+ * ToDo's for Logout User:
+    * update database by resetting refresh token!
+    * clear refresh and access token
+*/
+export const logoutUser = asyncHandler(async(req,res, next)=>{
+    // throw new apiError(500, "intentional termination for unit testing");
+    const updatedUser = await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set: {
+                refreshToken:1
+            }
+        }, 
+        {
+            new: true, //returns updates value
+        }
+    )
+    return res
+    .status(200)
+    .clearCookie("accessToken", options)
+    .clearCookie("refreshToken", options)
+    .json(
+        new apiResponse(200, "Logout SUCCESS!")
+    );
+})
+
+

@@ -16,3 +16,4 @@ connectDB()
 .catch(error=>{
     throw new apiError(503, "FAILED to connect database!", error);
 })
+
