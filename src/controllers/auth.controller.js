@@ -2,6 +2,7 @@ import apiError from "../utils/apiError.js";
 import apiResponse from '../utils/apiReponse.js'
 import asyncHandler from "../utils/asyncHandler.js";
 import { User } from '../models/user.model.js'
+import { threadId } from "worker_threads";
 
 /********************* Time to Learn RegEx **************************/
 // Username validation: alphanumeric characters and underscores allowed, length between 5 and 20 characters
@@ -62,6 +63,25 @@ const validateCredentials = (username, email, password, confirmPassword)=>{
     * get the created user by id remove sensitive credentials like password and refersh token
     * send the status 
  **/
+const generateAccessAndRefreshToken = async(userId) => {
+    try{
+        const currentUser = await User.findById(userId); //whenever there's a communication between data base ASYNC AWAIT is mendatory otherwise you will end up your whole day finding bugs
+        const accessToken = currentUser.generateAccessToken();
+        const refreshToken = currentUser.generateRefreshToken();
+        currentUser.refreshToken = refreshToken; //for refreshing the token once access token in expired
+        currentUser// Save or update the user document in the database
+        .save()
+        .then(savedUser => {
+            console.log('User saved successfully:', savedUser);
+          })
+        .catch(err => {
+            console.error('Error saving user:', err);
+          });
+        return {accessToken, refreshToken};
+    }catch(error){
+        throw new apiError(500, 'something went wrong while generatign access and refresh token');
+    }
+}
 export const registerUser = asyncHandler(async (req, res, next)=>{
     const {username, email, password, confirmPassword} = req.body;
     console.log(req.body)
@@ -102,6 +122,50 @@ export const registerUser = asyncHandler(async (req, res, next)=>{
     
 });
 
-export const loginUser = asyncHandler(async(req, res, next)=>{
 
+/*
+ * Login ToDo's:
+    * Extracti Credentials from from data
+    * validate them and send proper error if found any!
+    * check if user exits! either by email or username in one single field!
+    * match password
+    * if found generate access and refresh token
+    * set them to cookie and 
+    * send successful response with suitable data!
+*/
+
+export const loginUser = asyncHandler(async(req, res, next)=>{
+ const { usernameOrEmail, password } = req.body;
+        if(!usernameOrEmail){
+            throw new apiError(400, "Username or email is required!")
+        }
+        // console.log(usernameOrEmail)
+        let query = {};
+        if(validateEmail(usernameOrEmail)){
+            query = {email: usernameOrEmail}
+        }else{
+            if(validateUsername(usernameOrEmail)){
+                query = {username: usernameOrEmail}
+            }
+            else{
+                throw new apiError(404, "invalid username!");
+            }
+        }
+    
+        const currentUser = await User.findOne(query); //query is already an object bro! no need to pass as {query}
+        if(!currentUser){
+            throw new apiError(404, "User doesn't exist");
+        }
+        console.log(currentUser)
+        const isPasswordValid = await currentUser.isPasswordCorrect(password);
+        console.log(isPasswordValid)
+    
+        if(!isPasswordValid){
+            throw new apiError(404, "INVALID credentials!");
+        }
+        const {accessToken, refreshToken} = await generateAccessAndRefreshToken(currentUser?._id);
+        console.log(accessToken, refreshToken)
+        throw new apiError(500, "intentional termination for unit testing!");
+   
+    
 })

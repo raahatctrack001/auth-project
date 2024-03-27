@@ -25,7 +25,7 @@ const userSchema = new mongoose.Schema(
         trim: true,
       } , 
       refreshToken: {
-        type: String,
+        type: String
       }
     }, 
     {timestamps:true}
@@ -43,8 +43,9 @@ userSchema.pre("save", async function (next) {
 })
 
 //method injection: to check whether entered password is correct or not
-userSchema.methods.isPasswordCorrect = (password)=>{
-    return bcryptjs.compareSync(password, this.password);
+userSchema.methods.isPasswordCorrect = async function (password) {
+    console.log('inside userSchema', password)
+    return await bcryptjs.compare(password, this.password);
 }
 
 /* 
@@ -64,7 +65,8 @@ userSchema.methods.isPasswordCorrect = (password)=>{
 */
 
 //method injection: generate access token with jwt
-userSchema.methods.generateAccessToken = async ()=>{
+//donot make it arrow function it's not working!
+userSchema.methods.generateAccessToken = function(){
     return jwt.sign(
         {
             _id : this._id,
@@ -80,10 +82,10 @@ userSchema.methods.generateAccessToken = async ()=>{
 
 
 //method injection: generate access token
-userSchema.methods.generateRefreshToken = ()=>{
+userSchema.methods.generateRefreshToken = function (){
     return {
         _id : this._id,
-    }
+    },
     process.env.REFRESH_TOKEN_SECRET,
     {
         expiresIn: process.env.REFERSH_TOKEN_EXPIRY

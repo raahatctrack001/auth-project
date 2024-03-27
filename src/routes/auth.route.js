@@ -6,7 +6,7 @@ import { upload } from "../middlewares/multer.middleware.js";
 const router = Router();
 //syntax: router.route(define route here).apitype(middleware, controller)
 router.route('/register').post(upload.any(),  registerUser);
-router.route('/login').post(loginUser);
+router.route('/login').post(upload.any(), loginUser);
 
 
 export default router;
