@@ -69,10 +69,12 @@ const generateAccessAndRefreshToken = async(userId) => {
         const accessToken = currentUser.generateAccessToken();
         const refreshToken = currentUser.generateRefreshToken();
         currentUser.refreshToken = refreshToken; //for refreshing the token once access token in expired
+       
+
         currentUser// Save or update the user document in the database
         .save()
         .then(savedUser => {
-            console.log('User saved successfully:', savedUser);
+            console.log('Tokens generated and added successfully!');
           })
         .catch(err => {
             console.error('Error saving user:', err);
@@ -82,6 +84,12 @@ const generateAccessAndRefreshToken = async(userId) => {
         throw new apiError(500, 'something went wrong while generatign access and refresh token');
     }
 }
+
+const options = {
+    httpOnly: true,
+    secure: true
+}
+
 export const registerUser = asyncHandler(async (req, res, next)=>{
     const {username, email, password, confirmPassword} = req.body;
     console.log(req.body)
@@ -114,7 +122,7 @@ export const registerUser = asyncHandler(async (req, res, next)=>{
         throw new apiError(500, "FAILED to register your account!, plz try again later.")
     }
 
-    res
+    return res
     .status(200)
     .json(
         new apiResponse(200, "Registration successfull!", createdUser)
@@ -156,16 +164,23 @@ export const loginUser = asyncHandler(async(req, res, next)=>{
         if(!currentUser){
             throw new apiError(404, "User doesn't exist");
         }
-        console.log(currentUser)
+        // console.log(currentUser)
         const isPasswordValid = await currentUser.isPasswordCorrect(password);
-        console.log(isPasswordValid)
+        // console.log(isPasswordValid)
     
         if(!isPasswordValid){
             throw new apiError(404, "INVALID credentials!");
         }
-        const {accessToken, refreshToken} = await generateAccessAndRefreshToken(currentUser?._id);
-        console.log(accessToken, refreshToken)
-        throw new apiError(500, "intentional termination for unit testing!");
-   
-    
+        const { accessToken, refreshToken } = await generateAccessAndRefreshToken(currentUser?._id);
+        const loggedInUser = await User.findById(currentUser?._id).select("-password -refreshToken");
+        console.log(loggedInUser);
+        
+        // throw new apiError(500, "intentional termination for unit testing!");
+        return res
+        .status(200)
+        .cookie("accessToken", accessToken, options)
+        .cookie("refreshToken", refreshToken, options)
+        .json(
+            new apiResponse(200, "Login Successful!", {user: loggedInUser, accessToken, refreshToken})
+        );   
 })

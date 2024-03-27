@@ -44,7 +44,7 @@ userSchema.pre("save", async function (next) {
 
 //method injection: to check whether entered password is correct or not
 userSchema.methods.isPasswordCorrect = async function (password) {
-    console.log('inside userSchema', password)
+    // console.log('inside userSchema', password)
     return await bcryptjs.compare(password, this.password);
 }
 
@@ -81,15 +81,18 @@ userSchema.methods.generateAccessToken = function(){
 }
 
 
-//method injection: generate access token
-userSchema.methods.generateRefreshToken = function (){
-    return {
-        _id : this._id,
-    },
-    process.env.REFRESH_TOKEN_SECRET,
-    {
-        expiresIn: process.env.REFERSH_TOKEN_EXPIRY
-    }
+//method injection: generate refresh token
+userSchema.methods.generateRefreshToken = function(){
+    return jwt.sign(
+        {
+            _id: this._id,
+            
+        },
+        process.env.REFRESH_TOKEN_SECRET, //To avoid typos, copy paste the variables or constants
+        {
+            expiresIn: process.env.REFRESH_TOKEN_EXPIRY,
+        }
+    )
 }
 
 
