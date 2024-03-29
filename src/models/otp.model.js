@@ -1,29 +1,22 @@
 import mongoose from 'mongoose';
 
- const otpSchema = mongoose.Schema(
-    {
-        username: {
-            type: String,
-            required: true,
-        },
-        email: {
-            type: String,
-            required: true,
-        },
+const otpSchema = new mongoose.Schema({
+    email: {
+        type: String,
+        required: true,
+        unique: true // Ensure email uniqueness
+    },
+    otps: [{
         otp: {
-            type: []
+            type: String,
+            required: true
+        },
+        createdAt: {
+            type: Date,
+            expires: 300, // Set expiry time to 5 minutes (300 seconds)
+            default: Date.now
         }
-    }, 
-    {timeStamp: true}
- );
-
- otpSchema.methods.resetOTP = function(){
-    if(this.isModified('otp')){
-        setTimeout(() => {
-           this.otp = '' 
-        }, 120000);
-    }
- }
-
+    }]
+});
 
 export const otp = mongoose.model("otp", otpSchema);

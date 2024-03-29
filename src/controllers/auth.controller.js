@@ -4,17 +4,18 @@ import asyncHandler from "../utils/asyncHandler.js";
 import { User } from '../models/user.model.js';
 import bcryptjs from 'bcryptjs';
 import { otp } from "../models/otp.model.js";
-import { captureRejectionSymbol } from "events";
+import nodemailer from 'nodemailer';
+import { verify } from "crypto";
 
 /********************* Time to Learn RegEx **************************/
 // Username validation: alphanumeric characters and underscores allowed, length between 5 and 20 characters
-const  validateUsername = (username) => {
+export const  validateUsername = (username) => {
     const usernameRegex = /^[a-zA-Z0-9_]{5,20}$/;
     return usernameRegex.test(username);
 }
 
 // Email validation using a regular expression
-const validateEmail = (email) => {
+export const validateEmail = (email) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
 }
@@ -284,58 +285,156 @@ export const changeCurrentPassword = asyncHandler(async (req, res, next)=>{
 
 })
 
+/**
+ * To Do's for forgot and reset password:
+ *  api/v1/auth/reset-password
+    * 1. get email or phone or username
+    * 2. validate each and check if user exists
+    * 3. add otp to database linked with username 
+ * api/v1/auth/reset-password/verify
+    * 1. get email or phone or username taken from last route
+    * 2. validate each and check if user exists    
+    * 3. now take otp as extra data for verification!
+    * 4. check if otp matches!
+    * 5. if yes reset password
+    * 6. else send unauthorised access!
+    * 
+ */
 
-const generateOTP = ()=>{
-    const otp = Math.floor(Math.random()*1000000);
-    return otp;
+// Nodemailer transporter setup
+// const transporter = nodemailer.createTransport({
+//     service: 'gmail',
+//     auth: {
+//         user: process.env.EMAIL_USER,
+//         pass: process.env.EMAIL_PASS,
+//     },
+// });
+// async function sendEmail(transporter, email, otp) {
+//     try {
+//         const mailOptions = 
+    
+//         const response = await transporter.sendMail(mailOptions);
+//         console.log("mail response: ", response)
+//     } catch (error) {
+//         console.log("mail error: ", error.message);
+//     }
+// }
+
+// Function to send OTP via email
+async function sendEmail(transporter, email, otp) {
+    try {
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to: email,
+            subject: 'Reset Password OTP',
+            text: `Your OTP for resetting password is: ${otp}`,
+        };
+    
+        return await transporter.sendMail(mailOptions);
+    } catch (error) {
+        return res
+        .status(401)
+        .json(
+            new apiResponse(401,"Failed to send otp!")
+        )
+    }
 }
 
-export const recoverAccount = asyncHandler(async (req, res, next)=>{
-        const { usernameOrEmail } = req.body;
-        if(!usernameOrEmail){
-            throw new apiError(400, "Username or email is required!")
-        }
-        // console.log(usernameOrEmail)
-        let query = {};
-        if(validateEmail(usernameOrEmail)){
-            query = {email: usernameOrEmail}
-        }else{
-            if(validateUsername(usernameOrEmail)){
-                query = {username: usernameOrEmail}
-            }
-            else{
-                throw new apiError(404, "invalid username!");
-            }
-        }
-        const user = await User.findOne(query);
-        if(!user){
-            throw new apiError(401, "Unauthorised access!");
-        }
-
-        const currentUser = await User.findByIdAndUpdate(user?._id, 
-            {
-                $set:{
-                    refreshToken: 1,
-                },                
-            },
-            {
-                new: true,
-            }
-        ).select("-password")
-        // console.log(currentUser);
-        // const data = await otp.findOne(currentUser);
-        // console.log(data);
-        // throw new apiError(500, "intentional termination for unit testing!")
-        const generatedOTP = generateOTP();
-        const newOTPData = await otp.create({
-            username: currentUser?.username,
-            email: currentUser?.email,
-            otp: generatedOTP
+// Function to send OTP via SMS
+async function sendSMS(client, phoneNumber, otp) {
+    try {
+        const sentSMS = await client.messages.create({
+            body: `Your OTP for resetting password is: ${otp}`,
+            from: process.env.TWILIO_PHONE_NUMBER,
+            to: phoneNumber,
         });
-        if(!generateOTP){
-            throw new apiError(500, "FAILED to send otp!")
+
+        return sentSMS;
+    } catch (error) {
+        throw new apiError(401, 'Error sending SMS');
+    }
+}
+export const resetPassword = asyncHandler(async (req, res, next)=>{
+
+    const { usernameOrEmail } = req.body;
+    if(!usernameOrEmail){
+        throw new apiError(400, "Username or email is required!")
+    }
+    // console.log(usernameOrEmail)
+    let query = {};
+    if(validateEmail(usernameOrEmail)){
+        query = {email: usernameOrEmail}
+    }else{
+        if(validateUsername(usernameOrEmail)){
+            query = {username: usernameOrEmail}
         }
-        //send otp: nodemailer
-        req.otpData = newOTPData;
+        else{
+            throw new apiError(404, "invalid username!");
+        }
+    }
+    
+    const currentUser = await User.findOne(query);
+    if(!currentUser){
+        throw new apiError(404, "User doesn't exist")
+    }
+    
+    // console.log(currentUser);
+    //we have found the user now it's time to send otp
+    const transporter = nodemailer.createTransport({
+        service: 'gmail',
+        auth: {
+            user: process.env.EMAIL_USER,
+            pass: process.env.EMAIL_PASS,
+        },
+    });
+    
+    // Twilio client setup
+    const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+
+
+    try {
+        // Generate OTP (you can modify this logic)
+        const generatedOTP = Math.random().toString().slice(2, 8);
+        const newOTPData = await otp.create({
+            email: currentUser?.email,
+            opts: {generatedOTP}
+        })
+
+        if(!newOTPData){
+            throw new apiError(500, 'error while generating otp!')
+        }
+        // Send OTP via email or SMS based on input
+        if (emailOrPhone.includes('@')) {
+            // Send OTP via email
+            const sentEmail = await sendEmail(transporter, emailOrPhone, otp);
+            sentEmail
+            .then((response)=>{
+                console.log(response);
+            })
+            .cathc((error)=>{
+                console.log(error);
+            })
+        } else {
+            // Send OTP via SMS
+            const sentSMS = await sendSMS(client, emailOrPhone, otp);
+            sentSMS
+            .then((response)=>{
+                console.log(response);
+            })
+            .catch((error)=>{
+                console.log(error);
+            })
+        }
+    } catch (error) {
+        console.error('Error sending OTP:', error);
+        res.status(500).json({ error: 'Failed to send OTP.' });
+    }    
 })
 
+export const verifyOTP = asyncHandler(async(req, res, next)=>{
+    console.log(req.body);
+});
+
+export const setNewPassword = asyncHandler(async(req, res, next)=>{
+    console.log(req.body)
+})
