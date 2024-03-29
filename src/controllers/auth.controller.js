@@ -3,6 +3,8 @@ import apiResponse from '../utils/apiReponse.js'
 import asyncHandler from "../utils/asyncHandler.js";
 import { User } from '../models/user.model.js';
 import bcryptjs from 'bcryptjs';
+import { otp } from "../models/otp.model.js";
+import { captureRejectionSymbol } from "events";
 
 /********************* Time to Learn RegEx **************************/
 // Username validation: alphanumeric characters and underscores allowed, length between 5 and 20 characters
@@ -252,6 +254,7 @@ export const changeCurrentPassword = asyncHandler(async (req, res, next)=>{
     const hashedPassword = bcryptjs.hashSync(newPassword);
     let currentUser = await User.findById(req.user?._id);
     currentUser.password  = hashedPassword;
+    
     currentUser
     .save()
     .then((savedUser)=>{
@@ -280,3 +283,59 @@ export const changeCurrentPassword = asyncHandler(async (req, res, next)=>{
     console.log(currentUser);
 
 })
+
+
+const generateOTP = ()=>{
+    const otp = Math.floor(Math.random()*1000000);
+    return otp;
+}
+
+export const recoverAccount = asyncHandler(async (req, res, next)=>{
+        const { usernameOrEmail } = req.body;
+        if(!usernameOrEmail){
+            throw new apiError(400, "Username or email is required!")
+        }
+        // console.log(usernameOrEmail)
+        let query = {};
+        if(validateEmail(usernameOrEmail)){
+            query = {email: usernameOrEmail}
+        }else{
+            if(validateUsername(usernameOrEmail)){
+                query = {username: usernameOrEmail}
+            }
+            else{
+                throw new apiError(404, "invalid username!");
+            }
+        }
+        const user = await User.findOne(query);
+        if(!user){
+            throw new apiError(401, "Unauthorised access!");
+        }
+
+        const currentUser = await User.findByIdAndUpdate(user?._id, 
+            {
+                $set:{
+                    refreshToken: 1,
+                },                
+            },
+            {
+                new: true,
+            }
+        ).select("-password")
+        // console.log(currentUser);
+        // const data = await otp.findOne(currentUser);
+        // console.log(data);
+        // throw new apiError(500, "intentional termination for unit testing!")
+        const generatedOTP = generateOTP();
+        const newOTPData = await otp.create({
+            username: currentUser?.username,
+            email: currentUser?.email,
+            otp: generatedOTP
+        });
+        if(!generateOTP){
+            throw new apiError(500, "FAILED to send otp!")
+        }
+        //send otp: nodemailer
+        req.otpData = newOTPData;
+})
+
